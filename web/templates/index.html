@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.title}} - Web Page Analyzer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .form-section {
+            padding: 40px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+            font-size: 1.1rem;
+        }
+
+        .form-group input[type="url"] {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input[type="url"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #f5c6cb;
+            font-weight: 500;
+        }
+
+        .results-section {
+            padding: 40px;
+        }
+
+        .results-header {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .results-header h2 {
+            color: #495057;
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+        }
+
+        .results-header p {
+            color: #6c757d;
+            font-size: 1rem;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .result-card {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            transition: transform 0.2s ease;
+        }
+
+        .result-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .result-card h3 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+
+        .result-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .headings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .heading-item {
+            background: white;
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .heading-item strong {
+            display: block;
+            color: #667eea;
+            font-size: 0.9rem;
+        }
+
+        .heading-item span {
+            display: block;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #495057;
+        }
+
+        .stats-section {
+            background: #e9ecef;
+            padding: 25px;
+            border-radius: 10px;
+            margin-top: 30px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #667eea;
+            display: block;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            color: white;
+            opacity: 0.8;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .form-section,
+            .results-section {
+                padding: 20px;
+            }
+
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #e9ecef;
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🔍 Web Page Analyzer</h1>
+        <p>Analyze web pages for structure, content, and links</p>
+    </div>
+
+    <div class="main-content">
+        <div class="form-section">
+            <form method="POST" action="/analyze">
+                <div class="form-group">
+                    <label for="url">Enter URL to analyze:</label>
+                    <input type="url" id="url" name="url" placeholder="https://example.com" required>
+                </div>
+                <button type="submit" class="btn">Analyze Page</button>
+            </form>
+        </div>
+
+        {{if .error}}
+        <div class="error-message">
+            <strong>Error:</strong> {{.error}}
+        </div>
+        {{end}}
+
+        {{if .result}}
+        <div class="results-section">
+            <div class="results-header">
+                <h2>Analysis Results</h2>
+                <p>Analysis completed for: <strong>{{.result.URL}}</strong></p>
+            </div>
+
+            <div class="results-grid">
+                <div class="result-card">
+                    <h3>HTML Version</h3>
+                    <div class="result-value">{{.result.HTMLVersion}}</div>
+                </div>
+
+                <div class="result-card">
+                    <h3>Page Title</h3>
+                    <div class="result-value">{{.result.PageTitle}}</div>
+                </div>
+
+                <div class="result-card">
+                    <h3>Login Form</h3>
+                    <div class="result-value">{{if .result.HasLoginForm}}Yes{{else}}No{{end}}</div>
+                </div>
+
+                <div class="result-card">
+                    <h3>Headings</h3>
+                    {{if .result.Headings}}
+                    <div class="headings-grid">
+                        {{range $level, $count := .result.Headings}}
+                        <div class="heading-item">
+                            <strong>{{$level}}</strong>
+                            <span>{{$count}}</span>
+                        </div>
+                        {{end}}
+                    </div>
+                    {{else}}
+                    <div class="result-value">0</div>
+                    {{end}}
+                </div>
+            </div>
+
+            <div class="stats-section">
+                <h3 style="margin-bottom: 20px; color: #495057;">Link Analysis</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-number">{{.result.InternalLinks}}</span>
+                        <span class="stat-label">Internal Links</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{.result.ExternalLinks}}</span>
+                        <span class="stat-label">External Links</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{.result.InaccessibleLinks}}</span>
+                        <span class="stat-label">Inaccessible Links</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{.result.AnalysisTime}}</span>
+                        <span class="stat-label">Analysis Time</span>
+                    </div>
+                </div>
+            </div>
+
+            {{if .result.Error}}
+            <div class="error-message">
+                <strong>Analysis Error:</strong> {{.result.Error}}
+                {{if .result.HTTPStatusCode}}
+                <br><strong>HTTP Status Code:</strong> {{.result.HTTPStatusCode}}
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2024 Web Page Analyzer. Built with Go and Gin.</p>
+    </div>
+</div>
+</body>
+</html> 
