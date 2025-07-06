@@ -4,24 +4,115 @@ import (
 	"WebAppAnalyzer/config/env"
 	"WebAppAnalyzer/config/logger"
 	"WebAppAnalyzer/internal/models"
+	"WebAppAnalyzer/internal/validator"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
 
-// TestPageAnalyzer tests the main analyzer functionality
-func TestPageAnalyzer(t *testing.T) {
-	// Setup test environment
+// MockResponse represents a mock HTTP response
+type MockResponse struct {
+	StatusCode int
+	Body       string
+	Headers    map[string]string
+	Error      error
+}
+
+// MockTransport implements http.RoundTripper for testing
+type MockTransport struct {
+	responses map[string]*MockResponse
+}
+
+func (m *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	url := req.URL.String()
+
+	if response, exists := m.responses[url]; exists {
+		if response.Error != nil {
+			return nil, response.Error
+		}
+
+		// Create a mock response
+		resp := &http.Response{
+			StatusCode: response.StatusCode,
+			Body:       io.NopCloser(strings.NewReader(response.Body)),
+			Header:     make(http.Header),
+			Request:    req,
+		}
+
+		// Add headers if provided
+		for key, value := range response.Headers {
+			resp.Header.Set(key, value)
+		}
+
+		return resp, nil
+	}
+
+	// Default 404 response for unknown URLs
+	return &http.Response{
+		StatusCode: 404,
+		Body:       io.NopCloser(strings.NewReader("Not Found")),
+		Request:    req,
+	}, nil
+}
+
+// createTestAnalyzer creates an analyzer with mock HTTP client for testing
+func createTestAnalyzer() (*PageAnalyzer, *MockTransport) {
 	config := &env.Config{
 		LogLevel: "debug",
 	}
 	logger := logger.NewLogger(*config)
 
-	// Create analyzer
-	analyzer := NewPageAnalyzer(logger, config)
+	mockTransport := &MockTransport{
+		responses: make(map[string]*MockResponse),
+	}
+
+	analyzer := &PageAnalyzer{
+		client: &http.Client{
+			Transport: mockTransport,
+			Timeout:   30 * time.Second,
+		},
+		validator: validator.NewURLValidator(),
+		logger:    logger,
+		config:    config,
+	}
+
+	return analyzer, mockTransport
+}
+
+// TestPageAnalyzer tests the main analyzer functionality
+func TestPageAnalyzer(t *testing.T) {
+	analyzer, mockTransport := createTestAnalyzer()
+
+	// Setup mock responses
+	mockTransport.responses["https://example.com"] = &MockResponse{
+		StatusCode: 200,
+		Body: `<!DOCTYPE html>
+<html>
+<head>
+    <title>Example Domain</title>
+</head>
+<body>
+    <h1>Example Domain</h1>
+    <p>This domain is for use in illustrative examples.</p>
+    <a href="https://www.iana.org/domains/example">More information...</a>
+</body>
+</html>`,
+		Headers: map[string]string{
+			"Content-Type": "text/html",
+		},
+	}
+
+	mockTransport.responses["https://example.com/notfound"] = &MockResponse{
+		StatusCode: 404,
+		Body:       "Not Found",
+		Headers: map[string]string{
+			"Content-Type": "text/plain",
+		},
+	}
 
 	// Test cases
 	testCases := []struct {
@@ -38,7 +129,7 @@ func TestPageAnalyzer(t *testing.T) {
 			expectedStatus: 200,
 			checkResult: func(t *testing.T, result *models.AnalysisResult) {
 				if result.PageTitle != "Example Domain" {
-					t.Errorf("Expected page title 'Test Page', got '%s'", result.PageTitle)
+					t.Errorf("Expected page title 'Example Domain', got '%s'", result.PageTitle)
 				}
 				if result.HTMLVersion != "HTML5" {
 					t.Errorf("Expected HTML version 'HTML5', got '%s'", result.HTMLVersion)
@@ -47,10 +138,10 @@ func TestPageAnalyzer(t *testing.T) {
 					t.Errorf("Expected 1 h1 heading, got %d", result.Headings["h1"])
 				}
 				if result.Headings["h2"] != 0 {
-					t.Errorf("Expected 2 h2 headings, got %d", result.Headings["h2"])
+					t.Errorf("Expected 0 h2 headings, got %d", result.Headings["h2"])
 				}
 				if result.InternalLinks != 0 {
-					t.Errorf("Expected 2 internal links, got %d", result.InternalLinks)
+					t.Errorf("Expected 0 internal links, got %d", result.InternalLinks)
 				}
 				if result.ExternalLinks != 1 {
 					t.Errorf("Expected 1 external link, got %d", result.ExternalLinks)
@@ -134,11 +225,7 @@ func TestPageAnalyzer(t *testing.T) {
 
 // TestHTMLParsing tests HTML parsing functionality
 func TestHTMLParsing(t *testing.T) {
-	config := &env.Config{
-		LogLevel: "debug",
-	}
-	logger := logger.NewLogger(*config)
-	analyzer := NewPageAnalyzer(logger, config)
+	analyzer, mockTransport := createTestAnalyzer()
 
 	// Test HTML with various elements
 	htmlContent := `<!DOCTYPE html>
@@ -162,17 +249,18 @@ func TestHTMLParsing(t *testing.T) {
 </body>
 </html>`
 
-	// Create a test server to serve the HTML
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(htmlContent))
-	}))
-	defer server.Close()
+	// Setup mock response
+	mockTransport.responses["https://testpage.com"] = &MockResponse{
+		StatusCode: 200,
+		Body:       htmlContent,
+		Headers: map[string]string{
+			"Content-Type": "text/html",
+		},
+	}
 
 	// Test the analyzer
 	ctx := context.Background()
-	result := analyzer.Analyze(ctx, server.URL)
+	result := analyzer.Analyze(ctx, "https://testpage.com")
 
 	// Verify results
 	if result.Error != "" {
@@ -217,11 +305,7 @@ func TestHTMLParsing(t *testing.T) {
 
 // TestFormDetection tests form detection functionality
 func TestFormDetection(t *testing.T) {
-	config := &env.Config{
-		LogLevel: "debug",
-	}
-	logger := logger.NewLogger(*config)
-	analyzer := NewPageAnalyzer(logger, config)
+	analyzer, mockTransport := createTestAnalyzer()
 
 	testCases := []struct {
 		name          string
@@ -284,19 +368,23 @@ func TestFormDetection(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
+	for i, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			// Create a test server
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "text/html")
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(fmt.Sprintf(`<!DOCTYPE html><html><head><title>Test</title></head><body>%s</body></html>`, tc.html)))
-			}))
-			defer server.Close()
+			// Create unique URL for each test case
+			testURL := fmt.Sprintf("https://test%d.com", i)
+
+			// Setup mock response
+			mockTransport.responses[testURL] = &MockResponse{
+				StatusCode: 200,
+				Body:       fmt.Sprintf(`<!DOCTYPE html><html><head><title>Test</title></head><body>%s</body></html>`, tc.html),
+				Headers: map[string]string{
+					"Content-Type": "text/html",
+				},
+			}
 
 			// Test the analyzer
 			ctx := context.Background()
-			result := analyzer.Analyze(ctx, server.URL)
+			result := analyzer.Analyze(ctx, testURL)
 
 			if result.Error != "" {
 				t.Errorf("Unexpected error: %s", result.Error)
@@ -311,20 +399,12 @@ func TestFormDetection(t *testing.T) {
 
 // TestLinkAnalysis tests link analysis functionality
 func TestLinkAnalysis(t *testing.T) {
-	config := &env.Config{
-		LogLevel: "debug",
-	}
-	logger := logger.NewLogger(*config)
-	analyzer := NewPageAnalyzer(logger, config)
+	analyzer, mockTransport := createTestAnalyzer()
 
-	// Create test server that serves different content based on path
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-
-		switch r.URL.Path {
-		case "/":
-			// Main page with various links
-			html := `<!DOCTYPE html>
+	// Setup mock responses for main page and internal links
+	mockTransport.responses["https://testlinks.com"] = &MockResponse{
+		StatusCode: 200,
+		Body: `<!DOCTYPE html>
 <html>
 <head><title>Main Page</title></head>
 <body>
@@ -334,24 +414,39 @@ func TestLinkAnalysis(t *testing.T) {
     <a href="https://external2.com">External Link 2</a>
     <a href="https://broken-link.com">Broken Link</a>
 </body>
-</html>`
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(html))
-		case "/internal1":
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("<html><body>Internal 1</body></html>"))
-		case "/internal2":
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("<html><body>Internal 2</body></html>"))
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer server.Close()
+</html>`,
+		Headers: map[string]string{
+			"Content-Type": "text/html",
+		},
+	}
+
+	mockTransport.responses["https://external1.com"] = &MockResponse{
+		StatusCode: 200,
+		Body:       "<html><body>External 1</body></html>",
+		Headers: map[string]string{
+			"Content-Type": "text/html",
+		},
+	}
+
+	mockTransport.responses["https://external2.com"] = &MockResponse{
+		StatusCode: 200,
+		Body:       "<html><body>External 2</body></html>",
+		Headers: map[string]string{
+			"Content-Type": "text/html",
+		},
+	}
+
+	mockTransport.responses["https://broken-link.com"] = &MockResponse{
+		StatusCode: 404,
+		Body:       "Not Found",
+		Headers: map[string]string{
+			"Content-Type": "text/plain",
+		},
+	}
 
 	// Test the analyzer
 	ctx := context.Background()
-	result := analyzer.Analyze(ctx, server.URL)
+	result := analyzer.Analyze(ctx, "https://testlinks.com")
 
 	if result.Error != "" {
 		t.Errorf("Unexpected error: %s", result.Error)
@@ -366,48 +461,67 @@ func TestLinkAnalysis(t *testing.T) {
 		t.Errorf("Expected 3 external links, got %d", result.ExternalLinks)
 	}
 
-	// Note: Inaccessible links count depends on the actual availability of external sites
-	// This is more of an integration test and may vary based on network conditions
+	// Check inaccessible links (should be 1 - the broken link)
+	if result.InaccessibleLinks != 1 {
+		t.Errorf("Expected 1 inaccessible link, got %d", result.InaccessibleLinks)
+	}
 }
 
 // TestErrorHandling tests various error scenarios
 func TestErrorHandling(t *testing.T) {
-	config := &env.Config{
-		LogLevel: "debug",
-	}
-	logger := logger.NewLogger(*config)
-	analyzer := NewPageAnalyzer(logger, config)
+	analyzer, mockTransport := createTestAnalyzer()
 
 	testCases := []struct {
 		name           string
-		serverBehavior func(w http.ResponseWriter, r *http.Request)
+		url            string
+		mockResponse   *MockResponse
 		expectedError  bool
 		expectedStatus int
 	}{
 		{
 			name: "Server returns 500 error",
-			serverBehavior: func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte("Internal Server Error"))
+			url:  "https://servererror.com",
+			mockResponse: &MockResponse{
+				StatusCode: 500,
+				Body:       "Internal Server Error",
+				Headers: map[string]string{
+					"Content-Type": "text/plain",
+				},
 			},
 			expectedError:  true,
 			expectedStatus: 500,
 		},
 		{
 			name: "Server returns 403 forbidden",
-			serverBehavior: func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(http.StatusForbidden)
-				w.Write([]byte("Forbidden"))
+			url:  "https://forbidden.com",
+			mockResponse: &MockResponse{
+				StatusCode: 403,
+				Body:       "Forbidden",
+				Headers: map[string]string{
+					"Content-Type": "text/plain",
+				},
 			},
 			expectedError:  true,
 			expectedStatus: 403,
 		},
 		{
 			name: "Server returns malformed HTML",
-			serverBehavior: func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "text/html")
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte("<html><body><unclosed>"))
+			url:  "https://malformed.com",
+			mockResponse: &MockResponse{
+				StatusCode: 200,
+				Body:       "<html><body><unclosed>",
+				Headers: map[string]string{
+					"Content-Type": "text/html",
+				},
+			},
+			expectedError:  true,
+			expectedStatus: 0,
+		},
+		{
+			name: "Network error",
+			url:  "https://networkerror.com",
+			mockResponse: &MockResponse{
+				Error: fmt.Errorf("network timeout"),
 			},
 			expectedError:  true,
 			expectedStatus: 0,
@@ -416,11 +530,11 @@ func TestErrorHandling(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(tc.serverBehavior))
-			defer server.Close()
+			// Setup mock response
+			mockTransport.responses[tc.url] = tc.mockResponse
 
 			ctx := context.Background()
-			result := analyzer.Analyze(ctx, server.URL)
+			result := analyzer.Analyze(ctx, tc.url)
 
 			if tc.expectedError {
 				if result.Error == "" {
@@ -437,41 +551,53 @@ func TestErrorHandling(t *testing.T) {
 
 // TestConcurrency tests concurrent link checking
 func TestConcurrency(t *testing.T) {
-	config := &env.Config{
-		LogLevel: "debug",
+	analyzer, mockTransport := createTestAnalyzer()
+
+	// Setup main page with many external links
+	mainPageHTML := `<!DOCTYPE html><html><head><title>Test</title></head><body>`
+	for i := 0; i < 10; i++ {
+		mainPageHTML += fmt.Sprintf(`<a href="https://external%d.com">External %d</a>`, i, i)
 	}
-	logger := logger.NewLogger(*config)
-	analyzer := NewPageAnalyzer(logger, config)
+	mainPageHTML += `</body></html>`
 
-	// Create a test server that simulates slow responses
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
+	mockTransport.responses["https://concurrencytest.com"] = &MockResponse{
+		StatusCode: 200,
+		Body:       mainPageHTML,
+		Headers: map[string]string{
+			"Content-Type": "text/html",
+		},
+	}
 
-		if r.URL.Path == "/" {
-			// Main page with many external links
-			html := `<!DOCTYPE html><html><head><title>Test</title></head><body>`
-			for i := 0; i < 10; i++ {
-				html += fmt.Sprintf(`<a href="https://external%d.com">External %d</a>`, i, i)
+	// Setup responses for external links (some accessible, some not)
+	for i := 0; i < 10; i++ {
+		url := fmt.Sprintf("https://external%d.com", i)
+		if i%2 == 0 {
+			// Even numbered links are accessible
+			mockTransport.responses[url] = &MockResponse{
+				StatusCode: 200,
+				Body:       fmt.Sprintf("<html><body>External %d</body></html>", i),
+				Headers: map[string]string{
+					"Content-Type": "text/html",
+				},
 			}
-			html += `</body></html>`
-
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(html))
 		} else {
-			// Simulate slow response for external links
-			time.Sleep(100 * time.Millisecond)
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("<html><body>External</body></html>"))
+			// Odd numbered links are inaccessible
+			mockTransport.responses[url] = &MockResponse{
+				StatusCode: 404,
+				Body:       "Not Found",
+				Headers: map[string]string{
+					"Content-Type": "text/plain",
+				},
+			}
 		}
-	}))
-	defer server.Close()
+	}
 
 	// Test with timeout context
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	start := time.Now()
-	result := analyzer.Analyze(ctx, server.URL)
+	result := analyzer.Analyze(ctx, "https://concurrencytest.com")
 	duration := time.Since(start)
 
 	// Verify the analysis completed within reasonable time
@@ -487,15 +613,16 @@ func TestConcurrency(t *testing.T) {
 	if result.ExternalLinks != 10 {
 		t.Errorf("Expected 10 external links, got %d", result.ExternalLinks)
 	}
+
+	// Should have detected inaccessible links
+	if result.InaccessibleLinks != 5 {
+		t.Errorf("Expected 5 inaccessible links, got %d", result.InaccessibleLinks)
+	}
 }
 
 // TestPerformance tests analyzer performance with large HTML
 func TestPerformance(t *testing.T) {
-	config := &env.Config{
-		LogLevel: "debug",
-	}
-	logger := logger.NewLogger(*config)
-	analyzer := NewPageAnalyzer(logger, config)
+	analyzer, mockTransport := createTestAnalyzer()
 
 	// Generate large HTML content
 	html := `<!DOCTYPE html><html><head><title>Large Page</title></head><body>`
@@ -519,18 +646,31 @@ func TestPerformance(t *testing.T) {
 
 	html += `</body></html>`
 
-	// Create test server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(html))
-	}))
-	defer server.Close()
+	// Setup mock response
+	mockTransport.responses["https://largepage.com"] = &MockResponse{
+		StatusCode: 200,
+		Body:       html,
+		Headers: map[string]string{
+			"Content-Type": "text/html",
+		},
+	}
+
+	// Setup responses for external links
+	for i := 0; i < 50; i++ {
+		url := fmt.Sprintf("https://external%d.com", i)
+		mockTransport.responses[url] = &MockResponse{
+			StatusCode: 200,
+			Body:       fmt.Sprintf("<html><body>External %d</body></html>", i),
+			Headers: map[string]string{
+				"Content-Type": "text/html",
+			},
+		}
+	}
 
 	// Test performance
 	ctx := context.Background()
 	start := time.Now()
-	result := analyzer.Analyze(ctx, server.URL)
+	result := analyzer.Analyze(ctx, "https://largepage.com")
 	duration := time.Since(start)
 
 	// Verify performance (should complete within 2 seconds)
@@ -566,17 +706,12 @@ func TestPerformance(t *testing.T) {
 
 // BenchmarkAnalyzer benchmarks the analyzer performance
 func BenchmarkAnalyzer(b *testing.B) {
-	config := &env.Config{
-		LogLevel: "debug",
-	}
-	logger := logger.NewLogger(*config)
-	analyzer := NewPageAnalyzer(logger, config)
+	analyzer, mockTransport := createTestAnalyzer()
 
-	// Create test server with sample HTML
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`<!DOCTYPE html>
+	// Setup mock response with sample HTML
+	mockTransport.responses["https://benchmark.com"] = &MockResponse{
+		StatusCode: 200,
+		Body: `<!DOCTYPE html>
 <html>
 <head><title>Benchmark Test</title></head>
 <body>
@@ -586,14 +721,25 @@ func BenchmarkAnalyzer(b *testing.B) {
     <a href="https://external.com">External Link</a>
     <form><input type="text"><input type="password"></form>
 </body>
-</html>`))
-	}))
-	defer server.Close()
+</html>`,
+		Headers: map[string]string{
+			"Content-Type": "text/html",
+		},
+	}
+
+	// Setup external link response
+	mockTransport.responses["https://external.com"] = &MockResponse{
+		StatusCode: 200,
+		Body:       "<html><body>External</body></html>",
+		Headers: map[string]string{
+			"Content-Type": "text/html",
+		},
+	}
 
 	ctx := context.Background()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		analyzer.Analyze(ctx, server.URL)
+		analyzer.Analyze(ctx, "https://benchmark.com")
 	}
 }

@@ -3,14 +3,20 @@ package handlers
 import (
 	"WebAppAnalyzer/config/env"
 	"WebAppAnalyzer/config/logger"
-	"WebAppAnalyzer/internal/analyzer"
+	"WebAppAnalyzer/internal/models"
+	"context"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"time"
 )
 
+// PageAnalyzerInterface defines the interface for page analysis
+type PageAnalyzerInterface interface {
+	Analyze(ctx context.Context, url string) *models.AnalysisResult
+}
+
 type Handler struct {
-	analyzer *analyzer.PageAnalyzer
+	analyzer PageAnalyzerInterface
 	logger   *logger.Logger
 	config   *env.Config
 }
@@ -22,7 +28,7 @@ type APIError struct {
 }
 
 // NewHandler creates a new handler instance
-func NewHandler(pageAnalyzer *analyzer.PageAnalyzer, logger *logger.Logger, c *env.Config) *Handler {
+func NewHandler(pageAnalyzer PageAnalyzerInterface, logger *logger.Logger, c *env.Config) *Handler {
 	return &Handler{
 		analyzer: pageAnalyzer,
 		logger:   logger,

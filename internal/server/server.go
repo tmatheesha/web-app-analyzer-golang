@@ -11,6 +11,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -86,7 +88,7 @@ func (s Server) securityHeadersMiddleware() gin.HandlerFunc {
 		c.Header("X-Content-Type-Options", "nosniff")
 		c.Header("X-XSS-Protection", "1; mode=block")
 		c.Header("X-Frame-Options", "DENY")
-		c.Header("Content-Security-Policy", "default-src 'self'")
+		c.Header("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'")
 		c.Next()
 	}
 }
@@ -108,9 +110,52 @@ func (s Server) loggingMiddleware() gin.HandlerFunc {
 }
 
 func (s Server) setupRoutes() {
+	templatePaths := []string{
+		"web/templates/*.html",
+		"../web/templates/*.html",
+		"../../web/templates/*.html",
+	}
+	//s.engine.LoadHTMLGlob("../../web/templates/*.html")
 
-	s.engine.LoadHTMLGlob("../../web/templates/*.html")
-	s.engine.Static("../../static", "web/static")
+	templatesLoaded := false
+	for _, path := range templatePaths {
+		matches, err := filepath.Glob(path)
+		if err == nil && len(matches) > 0 {
+			s.engine.LoadHTMLGlob(path)
+			s.logger.WithField("template_path", path).Info("Templates loaded successfully")
+			templatesLoaded = true
+			break
+		} else {
+			s.logger.WithField("template_path", path).Warn("Templates not found at this path")
+		}
+	}
+
+	if !templatesLoaded {
+		s.logger.Error("Failed to load HTML templates from any path")
+		panic("HTML templates not found")
+	}
+
+	staticPaths := []string{
+		"web/static",
+		"../web/static",
+		"../../web/static",
+	}
+
+	staticServed := false
+	for _, path := range staticPaths {
+		if _, err := os.Stat(path); err == nil {
+			s.engine.Static("/static", path)
+			s.logger.WithField("static_path", path).Info("Static files served successfully")
+			staticServed = true
+			break
+		}
+	}
+
+	if !staticServed {
+		s.logger.Error("Failed to serve static files from any path")
+	}
+
+	//s.engine.Static("../../static", "web/static")
 	s.engine.GET("/health", s.handler.HealthCheck)
 
 	api := s.engine.Group("/api/v1")

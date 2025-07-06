@@ -46,6 +46,7 @@ func NewPageAnalyzer(logger *logger.Logger, c *env.Config) *PageAnalyzer {
 	}
 }
 
+// Analyze performs the analysis of the given URL and returns the result
 func (p *PageAnalyzer) Analyze(ctx context.Context, url string) *models.AnalysisResult {
 
 	result := models.NewAnalysisResult(url)
