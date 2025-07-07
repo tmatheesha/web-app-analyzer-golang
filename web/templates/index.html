@@ -275,6 +275,106 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        /* New analysis elements styles */
+        .images-grid, .scripts-grid, .stylesheets-grid, .forms-grid, .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .image-item, .script-item, .stylesheet-item, .form-item, .meta-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .image-info, .script-info, .stylesheet-info, .form-info, .meta-info {
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .truncate {
+            display: inline-block;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            vertical-align: bottom;
+        }
+
+        .missing {
+            color: #dc3545;
+            font-style: italic;
+        }
+
+        .external-badge, .login-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        .external-badge.external {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .external-badge.internal {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .login-badge.login {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .login-badge.regular {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        .accessibility-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .accessibility-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .accessibility-status {
+            display: block;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .accessibility-status.good {
+            color: #28a745;
+        }
+
+        .accessibility-status.warning {
+            color: #ffc107;
+        }
+
+        .accessibility-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+            font-weight: 500;
+        }
     </style>
 </head>
 <body>
@@ -363,6 +463,173 @@
                 </div>
             </div>
 
+            <!-- Content Statistics -->
+            <div class="stats-section">
+                <h3 style="margin-bottom: 20px; color: #495057;">Content Statistics</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-number">{{.result.Tables}}</span>
+                        <span class="stat-label">Tables</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{.result.Lists}}</span>
+                        <span class="stat-label">Lists</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{.result.Buttons}}</span>
+                        <span class="stat-label">Buttons</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{.result.Inputs}}</span>
+                        <span class="stat-label">Input Fields</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{.result.TextContent.WordCount}}</span>
+                        <span class="stat-label">Words</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{.result.TextContent.CharCount}}</span>
+                        <span class="stat-label">Characters</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">{{.result.TextContent.Paragraphs}}</span>
+                        <span class="stat-label">Paragraphs</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Images Analysis -->
+            {{if .result.Images}}
+            <div class="stats-section">
+                <h3 style="margin-bottom: 20px; color: #495057;">Images ({{len .result.Images}})</h3>
+                <div class="images-grid">
+                    {{range .result.Images}}
+                    <div class="image-item">
+                        <div class="image-info">
+                            <strong>Source:</strong> <span class="truncate">{{.Src}}</span><br>
+                            <strong>Alt Text:</strong> {{if .Alt}}{{.Alt}}{{else}}<span class="missing">Missing</span>{{end}}<br>
+                            {{if .Width}}<strong>Width:</strong> {{.Width}}{{end}}
+                            {{if .Height}}<strong>Height:</strong> {{.Height}}{{end}}
+                            <span class="external-badge {{if .IsExternal}}external{{else}}internal{{end}}">
+                                {{if .IsExternal}}External{{else}}Internal{{end}}
+                            </span>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+
+            <!-- Scripts Analysis -->
+            {{if .result.Scripts}}
+            <div class="stats-section">
+                <h3 style="margin-bottom: 20px; color: #495057;">Scripts ({{len .result.Scripts}})</h3>
+                <div class="scripts-grid">
+                    {{range .result.Scripts}}
+                    <div class="script-item">
+                        <div class="script-info">
+                            <strong>Source:</strong> <span class="truncate">{{.Src}}</span><br>
+                            {{if .Type}}<strong>Type:</strong> {{.Type}}{{end}}
+                            <span class="external-badge {{if .IsExternal}}external{{else}}internal{{end}}">
+                                {{if .IsExternal}}External{{else}}Internal{{end}}
+                            </span>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+
+            <!-- Stylesheets Analysis -->
+            {{if .result.Stylesheets}}
+            <div class="stats-section">
+                <h3 style="margin-bottom: 20px; color: #495057;">Stylesheets ({{len .result.Stylesheets}})</h3>
+                <div class="stylesheets-grid">
+                    {{range .result.Stylesheets}}
+                    <div class="stylesheet-item">
+                        <div class="stylesheet-info">
+                            <strong>Href:</strong> <span class="truncate">{{.Href}}</span><br>
+                            {{if .Media}}<strong>Media:</strong> {{.Media}}{{end}}
+                            <span class="external-badge {{if .IsExternal}}external{{else}}internal{{end}}">
+                                {{if .IsExternal}}External{{else}}Internal{{end}}
+                            </span>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+
+            <!-- Forms Analysis -->
+            {{if .result.Forms}}
+            <div class="stats-section">
+                <h3 style="margin-bottom: 20px; color: #495057;">Forms ({{len .result.Forms}})</h3>
+                <div class="forms-grid">
+                    {{range .result.Forms}}
+                    <div class="form-item">
+                        <div class="form-info">
+                            {{if .Action}}<strong>Action:</strong> <span class="truncate">{{.Action}}</span><br>{{end}}
+                            {{if .Method}}<strong>Method:</strong> {{.Method}}{{end}}
+                            <strong>Inputs:</strong> {{.InputCount}}
+                            <span class="login-badge {{if .HasLogin}}login{{else}}regular{{end}}">
+                                {{if .HasLogin}}Login Form{{else}}Regular Form{{end}}
+                            </span>
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+
+            <!-- Meta Tags Analysis -->
+            {{if .result.MetaTags}}
+            <div class="stats-section">
+                <h3 style="margin-bottom: 20px; color: #495057;">Meta Tags ({{len .result.MetaTags}})</h3>
+                <div class="meta-grid">
+                    {{range .result.MetaTags}}
+                    <div class="meta-item">
+                        <div class="meta-info">
+                            {{if .Name}}<strong>Name:</strong> {{.Name}}<br>{{end}}
+                            {{if .Property}}<strong>Property:</strong> {{.Property}}<br>{{end}}
+                            {{if .Content}}<strong>Content:</strong> <span class="truncate">{{.Content}}</span>{{end}}
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+
+            <!-- Accessibility Analysis -->
+            <div class="stats-section">
+                <h3 style="margin-bottom: 20px; color: #495057;">Accessibility</h3>
+                <div class="accessibility-grid">
+                    <div class="accessibility-item">
+                        <span class="accessibility-status {{if .result.Accessibility.HasAltText}}good{{else}}warning{{end}}">
+                            {{if .result.Accessibility.HasAltText}}✓{{else}}✗{{end}}
+                        </span>
+                        <span class="accessibility-label">Alt Text</span>
+                    </div>
+                    <div class="accessibility-item">
+                        <span class="accessibility-status {{if .result.Accessibility.HasARIALabels}}good{{else}}warning{{end}}">
+                            {{if .result.Accessibility.HasARIALabels}}✓{{else}}✗{{end}}
+                        </span>
+                        <span class="accessibility-label">ARIA Labels</span>
+                    </div>
+                    <div class="accessibility-item">
+                        <span class="accessibility-status {{if .result.Accessibility.HasSemanticHTML}}good{{else}}warning{{end}}">
+                            {{if .result.Accessibility.HasSemanticHTML}}✓{{else}}✗{{end}}
+                        </span>
+                        <span class="accessibility-label">Semantic HTML</span>
+                    </div>
+                    <div class="accessibility-item">
+                        <span class="accessibility-status {{if .result.Accessibility.HasSkipLinks}}good{{else}}warning{{end}}">
+                            {{if .result.Accessibility.HasSkipLinks}}✓{{else}}✗{{end}}
+                        </span>
+                        <span class="accessibility-label">Skip Links</span>
+                    </div>
+                </div>
+            </div>
+
             {{if .result.Error}}
             <div class="error-message">
                 <strong>Analysis Error:</strong> {{.result.Error}}
@@ -376,7 +643,8 @@
     </div>
 
     <div class="footer">
-        <p>&copy; 2024 Web Page Analyzer. Built with Go and Gin.</p>
+<!--        <p>&copy; 2025 Web App Analyzer. Built with Go and Gin By TMK.</p>-->
+        <p>&copy; 2025 Web App Analyzer. Built with Go and Gin By <span style="font-family: 'Pacifico', cursive; font-size: 1.2em; letter-spacing: 1px;">TMK</span>.</p>
     </div>
 </div>
 </body>

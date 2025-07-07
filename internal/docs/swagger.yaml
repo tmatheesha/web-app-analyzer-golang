@@ -1,0 +1,90 @@
+basePath: /api/v1
+definitions:
+  handlers.APIError:
+    properties:
+      code:
+        type: integer
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  models.AnalysisResult:
+    properties:
+      analysis_time:
+        description: Changed from time.Duration to string
+        example: 1.234s
+        type: string
+      error:
+        example: Failed to fetch page
+        type: string
+      external_links:
+        example: 2
+        type: integer
+      has_login_form:
+        example: true
+        type: boolean
+      headings:
+        additionalProperties:
+          type: integer
+        type: object
+      html_version:
+        example: HTML5
+        type: string
+      http_status_code:
+        example: 200
+        type: integer
+      inaccessible_links:
+        example: 0
+        type: integer
+      internal_links:
+        example: 5
+        type: integer
+      page_title:
+        example: Example Page
+        type: string
+      timestamp:
+        example: "2023-01-01T12:00:00Z"
+        type: string
+      url:
+        example: https://example.com
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: A web service that analyzes web pages and provides detailed information
+    about their structure, links, and forms.
+  title: Web Page Analyzer API
+  version: "1.0"
+paths:
+  /analyze:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Analyzes a web page based on the URL provided in the form submission
+      parameters:
+      - description: URL of the web page to analyze
+        in: formData
+        name: url
+        required: true
+        type: string
+      produces:
+      - text/html
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AnalysisResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handlers.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.APIError'
+      summary: Analyze a web page from form submission
+      tags:
+      - Analysis
+swagger: "2.0"

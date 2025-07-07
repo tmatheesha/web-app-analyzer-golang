@@ -78,8 +78,6 @@ func (p *PageAnalyzer) Analyze(ctx context.Context, url string) *models.Analysis
 		return result
 	}
 
-	p.logger.Info("Page analysis completed")
-
 	p.analyzeHTMLWithConcurrency(ctx, doc, validatedUrl, result)
 
 	p.logger.Info("Page analysis completed")
@@ -87,22 +85,36 @@ func (p *PageAnalyzer) Analyze(ctx context.Context, url string) *models.Analysis
 	return result
 }
 
+// analyzeHTMLWithConcurrency analyzes the HTML document concurrently
 func (p *PageAnalyzer) analyzeHTMLWithConcurrency(ctx context.Context, n *html.Node, baseURL string, result *models.AnalysisResult) {
 	externalLinks := make(chan string, 100)
-
-	var wg sync.WaitGroup
-
 	linkResults := make(chan LinkCheckResult, 100)
 
-	p.startLinkCheckers(ctx, externalLinks, linkResults, &wg)
+	// Start link checker workers in goroutines because they will block on network I/O
+	numWorkers := p.config.NumOfWorkers
+	var wg sync.WaitGroup
 
-	p.analyzeHTML(ctx, n, baseURL, result, externalLinks)
+	// Start multiple link checker workers
+	for i := 0; i < numWorkers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			p.linkChecker(ctx, externalLinks, linkResults)
+		}()
+	}
 
-	close(externalLinks)
+	go func() {
+		p.analyzeHTML(ctx, n, baseURL, result, externalLinks)
+		close(externalLinks)
+	}()
 
-	wg.Wait()
-	close(linkResults)
+	// Wait till all link checkers to finish, then close results channel
+	go func() {
+		wg.Wait()
+		close(linkResults)
+	}()
 
+	// Process results (this will block until all results are processed)
 	p.processLinkResults(linkResults, result)
 }
 
@@ -132,7 +144,6 @@ func (p *PageAnalyzer) analyzeHTML(ctx context.Context, n *html.Node, baseURL st
 			result.AddHeading(n.Data)
 		case "a":
 			p.analyzeLink(ctx, n, baseURL, result, externalLinks)
-			// Check for skip links
 			p.checkSkipLink(n, result)
 		case "form":
 			p.analyzeForm(n, result)
@@ -217,6 +228,7 @@ func (p *PageAnalyzer) analyzeForm(n *html.Node, result *models.AnalysisResult) 
 	}
 }
 
+// checkFormInputs recursively checks input fields in a form to determine if it contains login fields
 func (p *PageAnalyzer) checkFormInputs(n *html.Node, hasPassword, hasUsername, hasEmail *bool, inputCount *int) {
 	if n.Type == html.ElementNode && n.Data == "input" {
 		*inputCount++
@@ -232,7 +244,6 @@ func (p *PageAnalyzer) checkFormInputs(n *html.Node, hasPassword, hasUsername, h
 			}
 		}
 
-		// Check for password field
 		if inputType == "password" {
 			*hasPassword = true
 		}
@@ -350,18 +361,8 @@ func (p *PageAnalyzer) fetchPage(ctx context.Context, url string) (*http.Respons
 	return resp, nil
 }
 
-func (p *PageAnalyzer) startLinkCheckers(ctx context.Context, links <-chan string, results chan<- LinkCheckResult, wg *sync.WaitGroup) {
-	// Start 5 worker goroutines for link checking
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		go func(workerID int) {
-			defer wg.Done()
-			p.linkChecker(ctx, links, results, workerID)
-		}(i)
-	}
-}
-
-func (p *PageAnalyzer) linkChecker(ctx context.Context, links <-chan string, results chan<- LinkCheckResult, workerID int) {
+// linkChecker checks links concurrently and sends results to the results channel
+func (p *PageAnalyzer) linkChecker(ctx context.Context, links <-chan string, results chan<- LinkCheckResult) {
 	for linkURL := range links {
 		select {
 		case <-ctx.Done():

@@ -4,31 +4,29 @@ import "time"
 
 // AnalysisResult represents the result of analyzing a web page
 type AnalysisResult struct {
-	URL               string         `json:"url" example:"https://example.com"`
-	HTMLVersion       string         `json:"html_version" example:"HTML5"`
-	PageTitle         string         `json:"page_title" example:"Example Page"`
-	Headings          map[string]int `json:"headings"`
-	InternalLinks     int            `json:"internal_links" example:"5"`
-	ExternalLinks     int            `json:"external_links" example:"2"`
-	InaccessibleLinks int            `json:"inaccessible_links" example:"0"`
-	HasLoginForm      bool           `json:"has_login_form" example:"true"`
-	AnalysisTime      string         `json:"analysis_time" example:"1.234s"` // Changed from time.Duration to string
-	Timestamp         time.Time      `json:"timestamp" example:"2023-01-01T12:00:00Z"`
-	Error             string         `json:"error,omitempty" example:"Failed to fetch page"`
-	HTTPStatusCode    int            `json:"http_status_code,omitempty" example:"200"`
-
-	// New analysis fields
-	Images        []ImageInfo       `json:"images"`
-	MetaTags      []MetaTag         `json:"meta_tags"`
-	Scripts       []ScriptInfo      `json:"scripts"`
-	Stylesheets   []StylesheetInfo  `json:"stylesheets"`
-	Forms         []FormInfo        `json:"forms"`
-	Tables        int               `json:"tables" example:"2"`
-	Lists         int               `json:"lists" example:"5"`
-	Buttons       int               `json:"buttons" example:"3"`
-	Inputs        int               `json:"inputs" example:"8"`
-	TextContent   TextContentInfo   `json:"text_content"`
-	Accessibility AccessibilityInfo `json:"accessibility"`
+	URL               string            `json:"url" example:"https://example.com"`
+	HTMLVersion       string            `json:"html_version" example:"HTML5"`
+	PageTitle         string            `json:"page_title" example:"Example Page"`
+	Headings          map[string]int    `json:"headings"`
+	InternalLinks     int               `json:"internal_links" example:"5"`
+	ExternalLinks     int               `json:"external_links" example:"2"`
+	InaccessibleLinks int               `json:"inaccessible_links" example:"0"`
+	HasLoginForm      bool              `json:"has_login_form" example:"true"`
+	AnalysisTime      string            `json:"analysis_time" example:"1.234s"` // Changed from time.Duration to string
+	Timestamp         time.Time         `json:"timestamp" example:"2023-01-01T12:00:00Z"`
+	Error             string            `json:"error,omitempty" example:"Failed to fetch page"`
+	HTTPStatusCode    int               `json:"http_status_code,omitempty" example:"200"`
+	Images            []ImageInfo       `json:"images"`
+	MetaTags          []MetaTag         `json:"meta_tags"`
+	Scripts           []ScriptInfo      `json:"scripts"`
+	Stylesheets       []StylesheetInfo  `json:"stylesheets"`
+	Forms             []FormInfo        `json:"forms"`
+	Tables            int               `json:"tables" example:"2"`
+	Lists             int               `json:"lists" example:"5"`
+	Buttons           int               `json:"buttons" example:"3"`
+	Inputs            int               `json:"inputs" example:"8"`
+	TextContent       TextContentInfo   `json:"text_content"`
+	Accessibility     AccessibilityInfo `json:"accessibility"`
 }
 
 type ImageInfo struct {

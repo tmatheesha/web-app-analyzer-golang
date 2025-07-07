@@ -86,10 +86,8 @@ func (h *Handler) MethodNotAllowed(c *gin.Context) {
 // @Failure 500 {object} APIError "Internal Server Error"
 // @Router /analyze [post]
 func (h *Handler) AnalyzePageForm(c *gin.Context) {
-	// Get client IP for logging
 	clientIP := c.ClientIP()
 
-	// Log request
 	h.logger.WithRequest(c.Request.Method, c.Request.URL.Path, clientIP).
 		Info("Form analysis request received")
 
@@ -104,19 +102,15 @@ func (h *Handler) AnalyzePageForm(c *gin.Context) {
 		return
 	}
 
-	// Perform analysis
 	ctx := c.Request.Context()
 	startTime := time.Now()
 	result := h.analyzer.Analyze(ctx, url)
 
-	// Set analysis time
 	result.AnalysisTime = time.Since(startTime).String()
 
-	// Log completion
 	h.logger.WithField("success", result.IsSuccessful()).
 		Info("Form analysis completed")
 
-	// Return HTML response
 	c.HTML(http.StatusOK, "index.html", gin.H{
 		"title":  "Web Page Analyzer",
 		"result": result,
