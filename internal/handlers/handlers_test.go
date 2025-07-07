@@ -206,7 +206,7 @@ func TestAnalyzePage_ComplexResult(t *testing.T) {
 		InaccessibleLinks: 2,
 		HasLoginForm:      true,
 		HTTPStatusCode:    200,
-		AnalysisTime:      1500 * time.Millisecond,
+		AnalysisTime:      "1.5s",
 		Timestamp:         time.Now(),
 	}
 
@@ -367,7 +367,7 @@ func TestAnalyzePage_Performance(t *testing.T) {
 		URL:            "https://example.com",
 		PageTitle:      "Example",
 		HTTPStatusCode: 200,
-		AnalysisTime:   500 * time.Millisecond,
+		AnalysisTime:   "500ms",
 		Timestamp:      time.Now(),
 	}
 

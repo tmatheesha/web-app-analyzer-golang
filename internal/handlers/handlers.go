@@ -74,6 +74,17 @@ func (h *Handler) MethodNotAllowed(c *gin.Context) {
 	})
 }
 
+// AnalyzePageForm handles form submissions for page analysis
+// @Summary Analyze a web page from form submission
+// @Description Analyzes a web page based on the URL provided in the form submission
+// @Tags Analysis
+// @Accept  application/x-www-form-urlencoded
+// @Produce  html
+// @Param url formData string true "URL of the web page to analyze"
+// @Success 200 {object} models.AnalysisResult
+// @Failure 400 {object} APIError "Bad Request"
+// @Failure 500 {object} APIError "Internal Server Error"
+// @Router /analyze [post]
 func (h *Handler) AnalyzePageForm(c *gin.Context) {
 	// Get client IP for logging
 	clientIP := c.ClientIP()
@@ -95,7 +106,11 @@ func (h *Handler) AnalyzePageForm(c *gin.Context) {
 
 	// Perform analysis
 	ctx := c.Request.Context()
+	startTime := time.Now()
 	result := h.analyzer.Analyze(ctx, url)
+
+	// Set analysis time
+	result.AnalysisTime = time.Since(startTime).String()
 
 	// Log completion
 	h.logger.WithField("success", result.IsSuccessful()).

@@ -35,7 +35,6 @@ func (m *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			return nil, response.Error
 		}
 
-		// Create a mock response
 		resp := &http.Response{
 			StatusCode: response.StatusCode,
 			Body:       io.NopCloser(strings.NewReader(response.Body)),
@@ -43,7 +42,6 @@ func (m *MockTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			Request:    req,
 		}
 
-		// Add headers if provided
 		for key, value := range response.Headers {
 			resp.Header.Set(key, value)
 		}
@@ -99,6 +97,13 @@ func TestPageAnalyzer(t *testing.T) {
     <h1>Example Domain</h1>
     <p>This domain is for use in illustrative examples.</p>
     <a href="https://www.iana.org/domains/example">More information...</a>
+	<h2>Subheading</h2>
+	<p>Another paragraph.</p>
+    <form action="/login" method="post">
+		<input type="text" name="username" id="username">
+		<input type="password" name="password" id="password">
+		<input type="submit" value="Login">
+	</form>
 </body>
 </html>`,
 		Headers: map[string]string{
@@ -137,8 +142,8 @@ func TestPageAnalyzer(t *testing.T) {
 				if result.Headings["h1"] != 1 {
 					t.Errorf("Expected 1 h1 heading, got %d", result.Headings["h1"])
 				}
-				if result.Headings["h2"] != 0 {
-					t.Errorf("Expected 0 h2 headings, got %d", result.Headings["h2"])
+				if result.Headings["h2"] != 1 {
+					t.Errorf("Expected 1 h2 headings, got %d", result.Headings["h2"])
 				}
 				if result.InternalLinks != 0 {
 					t.Errorf("Expected 0 internal links, got %d", result.InternalLinks)

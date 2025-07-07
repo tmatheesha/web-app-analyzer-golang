@@ -101,7 +101,7 @@ race: deps
 docs:
 	@echo "Generating API documentation..."
 	@if command -v swag >/dev/null 2>&1; then \
-		swag init -g cmd/web-analyzer/main.go; \
+		swag init -g cmd/web-analyzer/main.go -o ./internal/docs --parseInternal; \
 	else \
 		echo "swag not found. Install with: go install github.com/swaggo/swag/cmd/swag@latest"; \
 	fi

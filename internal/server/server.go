@@ -10,6 +10,8 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -167,6 +169,9 @@ func (s Server) setupRoutes() {
 	//Web routes
 	s.engine.GET("/", s.handler.Index)
 	s.engine.POST("/analyze", s.handler.AnalyzePageForm)
+
+	//Swagger documentation
+	s.engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	s.engine.NoRoute(s.handler.NotFound)
 	s.engine.NoMethod(s.handler.MethodNotAllowed)

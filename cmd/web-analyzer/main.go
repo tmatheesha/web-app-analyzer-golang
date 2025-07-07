@@ -10,11 +10,16 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	// Import docs for swagger initialization
+	_ "WebAppAnalyzer/internal/docs"
 )
 
-//TIP <p>To run your code, right-click the code and select <b>Run</b>.</p> <p>Alternatively, click
-// the <icon src="AllIcons.Actions.Execute"/> icon in the gutter and select the <b>Run</b> menu item from here.</p>
-
+// @title           Web Page Analyzer API
+// @version         1.0
+// @description     A web service that analyzes web pages and provides detailed information about their structure, links, and forms.
+// @host      localhost:8080
+// @BasePath  /api/v1
 func main() {
 	config, err := env.LoadConfig(".")
 	if err != nil {

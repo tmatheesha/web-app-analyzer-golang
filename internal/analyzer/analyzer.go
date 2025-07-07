@@ -57,7 +57,6 @@ func (p *PageAnalyzer) Analyze(ctx context.Context, url string) *models.Analysis
 		return result
 	}
 
-	// Log the analysis request
 	p.logger.Info("Analyzing URL", validatedUrl)
 
 	resp, err := p.fetchPage(ctx, validatedUrl)
@@ -67,7 +66,6 @@ func (p *PageAnalyzer) Analyze(ctx context.Context, url string) *models.Analysis
 	}
 	defer resp.Body.Close()
 
-	// Check if the response is successful
 	if resp.StatusCode != http.StatusOK {
 		result.SetError(fmt.Sprintf("HTTP Error: %d - %s", resp.StatusCode, http.StatusText(resp.StatusCode)), resp.StatusCode)
 		return result
@@ -134,9 +132,37 @@ func (p *PageAnalyzer) analyzeHTML(ctx context.Context, n *html.Node, baseURL st
 			result.AddHeading(n.Data)
 		case "a":
 			p.analyzeLink(ctx, n, baseURL, result, externalLinks)
+			// Check for skip links
+			p.checkSkipLink(n, result)
 		case "form":
 			p.analyzeForm(n, result)
+		case "img":
+			p.analyzeImage(n, baseURL, result)
+		case "meta":
+			p.analyzeMetaTag(n, result)
+		case "script":
+			p.analyzeScript(n, baseURL, result)
+		case "link":
+			p.analyzeStylesheet(n, baseURL, result)
+		case "table":
+			result.Tables++
+		case "ul", "ol":
+			result.Lists++
+		case "button":
+			result.Buttons++
+		case "input":
+			result.Inputs++
+		case "p":
+			result.TextContent.Paragraphs++
+		case "main", "article", "section", "nav", "header", "footer", "aside":
+			result.Accessibility.HasSemanticHTML = true
 		}
+
+		// Check for ARIA labels on any element
+		p.checkARIALabels(n, result)
+	case html.TextNode:
+		// Analyze text content
+		p.analyzeTextContent(n, result)
 	}
 
 	// Recursively analyze child nodes
@@ -146,6 +172,9 @@ func (p *PageAnalyzer) analyzeHTML(ctx context.Context, n *html.Node, baseURL st
 }
 
 func (p *PageAnalyzer) analyzeForm(n *html.Node, result *models.AnalysisResult) {
+	formInfo := models.FormInfo{}
+	inputCount := 0
+
 	// Look for common login form indicators
 	hasPassword := false
 	hasUsername := false
@@ -154,32 +183,43 @@ func (p *PageAnalyzer) analyzeForm(n *html.Node, result *models.AnalysisResult) 
 	// Check form attributes
 	for _, attr := range n.Attr {
 		if attr.Key == "action" {
+			formInfo.Action = attr.Val
 			action := strings.ToLower(attr.Val)
 			if strings.Contains(action, "login") || strings.Contains(action, "signin") {
-				result.HasLoginForm = true
-				return
+				formInfo.HasLogin = true
 			}
+		}
+		if attr.Key == "method" {
+			formInfo.Method = strings.ToUpper(attr.Val)
 		}
 		if attr.Key == "id" || attr.Key == "class" {
 			value := strings.ToLower(attr.Val)
 			if strings.Contains(value, "login") || strings.Contains(value, "signin") {
-				result.HasLoginForm = true
-				return
+				formInfo.HasLogin = true
 			}
 		}
 	}
 
 	// Check for input fields
-	p.checkFormInputs(n, &hasPassword, &hasUsername, &hasEmail)
+	p.checkFormInputs(n, &hasPassword, &hasUsername, &hasEmail, &inputCount)
 
 	// Determine if it's a login form based on input fields
 	if hasPassword && (hasUsername || hasEmail) {
+		formInfo.HasLogin = true
+	}
+
+	formInfo.InputCount = inputCount
+	result.Forms = append(result.Forms, formInfo)
+
+	// Update the legacy field for backward compatibility
+	if formInfo.HasLogin {
 		result.HasLoginForm = true
 	}
 }
 
-func (p *PageAnalyzer) checkFormInputs(n *html.Node, hasPassword, hasUsername, hasEmail *bool) {
+func (p *PageAnalyzer) checkFormInputs(n *html.Node, hasPassword, hasUsername, hasEmail *bool, inputCount *int) {
 	if n.Type == html.ElementNode && n.Data == "input" {
+		*inputCount++
 		var inputType, inputName, inputID string
 		for _, attr := range n.Attr {
 			switch attr.Key {
@@ -212,7 +252,7 @@ func (p *PageAnalyzer) checkFormInputs(n *html.Node, hasPassword, hasUsername, h
 
 	// Recursively check child nodes
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		p.checkFormInputs(c, hasPassword, hasUsername, hasEmail)
+		p.checkFormInputs(c, hasPassword, hasUsername, hasEmail, inputCount)
 	}
 }
 
@@ -363,5 +403,183 @@ func (p *PageAnalyzer) checkSingleLink(ctx context.Context, linkURL string) Link
 		URL:          linkURL,
 		IsAccessible: resp.StatusCode == http.StatusOK,
 		StatusCode:   resp.StatusCode,
+	}
+}
+
+// analyzeImage analyzes an img element and extracts relevant information
+func (p *PageAnalyzer) analyzeImage(n *html.Node, baseURL string, result *models.AnalysisResult) {
+	imgInfo := models.ImageInfo{}
+
+	for _, attr := range n.Attr {
+		switch attr.Key {
+		case "src":
+			imgInfo.Src = attr.Val
+		case "alt":
+			imgInfo.Alt = attr.Val
+			if attr.Val != "" {
+				result.Accessibility.HasAltText = true
+			}
+		case "width":
+			imgInfo.Width = attr.Val
+		case "height":
+			imgInfo.Height = attr.Val
+		}
+	}
+
+	if imgInfo.Src != "" {
+		// Check if it's an external image
+		parsedURL, err := url.Parse(imgInfo.Src)
+		if err == nil {
+			if !parsedURL.IsAbs() {
+				baseParsed, err := url.Parse(baseURL)
+				if err == nil {
+					parsedURL = baseParsed.ResolveReference(parsedURL)
+				}
+			}
+			imgInfo.IsExternal = !p.validator.IsInternalLink(parsedURL.String(), baseURL)
+		}
+		result.Images = append(result.Images, imgInfo)
+	}
+}
+
+// analyzeMetaTag analyzes a meta element and extracts relevant information
+func (p *PageAnalyzer) analyzeMetaTag(n *html.Node, result *models.AnalysisResult) {
+	metaTag := models.MetaTag{}
+
+	for _, attr := range n.Attr {
+		switch attr.Key {
+		case "name":
+			metaTag.Name = attr.Val
+		case "content":
+			metaTag.Content = attr.Val
+		case "property":
+			metaTag.Property = attr.Val
+		}
+	}
+
+	if metaTag.Name != "" || metaTag.Property != "" {
+		result.MetaTags = append(result.MetaTags, metaTag)
+	}
+}
+
+// analyzeScript analyzes a script element and extracts relevant information
+func (p *PageAnalyzer) analyzeScript(n *html.Node, baseURL string, result *models.AnalysisResult) {
+	scriptInfo := models.ScriptInfo{}
+
+	for _, attr := range n.Attr {
+		switch attr.Key {
+		case "src":
+			scriptInfo.Src = attr.Val
+		case "type":
+			scriptInfo.Type = attr.Val
+		}
+	}
+
+	if scriptInfo.Src != "" {
+		// Check if it's an external script
+		parsedURL, err := url.Parse(scriptInfo.Src)
+		if err == nil {
+			if !parsedURL.IsAbs() {
+				baseParsed, err := url.Parse(baseURL)
+				if err == nil {
+					parsedURL = baseParsed.ResolveReference(parsedURL)
+				}
+			}
+			scriptInfo.IsExternal = !p.validator.IsInternalLink(parsedURL.String(), baseURL)
+		}
+		result.Scripts = append(result.Scripts, scriptInfo)
+	}
+}
+
+// analyzeStylesheet analyzes a link element for stylesheets and extracts relevant information
+func (p *PageAnalyzer) analyzeStylesheet(n *html.Node, baseURL string, result *models.AnalysisResult) {
+	var rel, href, media string
+
+	for _, attr := range n.Attr {
+		switch attr.Key {
+		case "rel":
+			rel = strings.ToLower(attr.Val)
+		case "href":
+			href = attr.Val
+		case "media":
+			media = attr.Val
+		}
+	}
+
+	if rel == "stylesheet" && href != "" {
+		stylesheetInfo := models.StylesheetInfo{
+			Href:  href,
+			Media: media,
+		}
+
+		// Check if it's an external stylesheet
+		parsedURL, err := url.Parse(href)
+		if err == nil {
+			if !parsedURL.IsAbs() {
+				baseParsed, err := url.Parse(baseURL)
+				if err == nil {
+					parsedURL = baseParsed.ResolveReference(parsedURL)
+				}
+			}
+			stylesheetInfo.IsExternal = !p.validator.IsInternalLink(parsedURL.String(), baseURL)
+		}
+		result.Stylesheets = append(result.Stylesheets, stylesheetInfo)
+	}
+}
+
+// analyzeTextContent analyzes text nodes for content statistics
+func (p *PageAnalyzer) analyzeTextContent(n *html.Node, result *models.AnalysisResult) {
+	text := strings.TrimSpace(n.Data)
+	if text == "" {
+		return
+	}
+
+	// Count characters
+	result.TextContent.CharCount += len(text)
+
+	// Count words (simple word counting)
+	words := strings.Fields(text)
+	result.TextContent.WordCount += len(words)
+}
+
+// checkSkipLink checks if a link is a skip link for accessibility
+func (p *PageAnalyzer) checkSkipLink(n *html.Node, result *models.AnalysisResult) {
+	for _, attr := range n.Attr {
+		if attr.Key == "href" && strings.HasPrefix(attr.Val, "#") {
+			// Check if it's a skip link by looking at text content or aria-label
+			text := p.getTextContent(n)
+			text = strings.ToLower(text)
+			if strings.Contains(text, "skip") || strings.Contains(text, "jump") {
+				result.Accessibility.HasSkipLinks = true
+				return
+			}
+		}
+	}
+}
+
+// checkARIALabels checks for ARIA labels on elements
+func (p *PageAnalyzer) checkARIALabels(n *html.Node, result *models.AnalysisResult) {
+	for _, attr := range n.Attr {
+		if strings.HasPrefix(attr.Key, "aria-") && attr.Val != "" {
+			result.Accessibility.HasARIALabels = true
+			return
+		}
+	}
+}
+
+// getTextContent extracts text content from a node and its children
+func (p *PageAnalyzer) getTextContent(n *html.Node) string {
+	var text strings.Builder
+	p.extractText(n, &text)
+	return strings.TrimSpace(text.String())
+}
+
+// extractText recursively extracts text from a node and its children
+func (p *PageAnalyzer) extractText(n *html.Node, text *strings.Builder) {
+	if n.Type == html.TextNode {
+		text.WriteString(n.Data)
+	}
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		p.extractText(c, text)
 	}
 }
