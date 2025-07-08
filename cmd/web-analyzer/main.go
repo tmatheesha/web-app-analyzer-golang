@@ -5,8 +5,10 @@ import (
 	"WebAppAnalyzer/config/logger"
 	"WebAppAnalyzer/internal/server"
 	"context"
+	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
@@ -21,7 +23,23 @@ import (
 // @host      localhost:8080
 // @BasePath  /api/v1
 func main() {
-	config, err := env.LoadConfig(".")
+	configPaths := []string{
+		"cmd/web-analyzer/app.env",
+		"./app.env",
+	}
+	correctConfigPaths := "."
+
+	for _, path := range configPaths {
+		matches, err := filepath.Glob(path)
+		if err == nil && len(matches) > 0 {
+			//correctConfigPaths = matches[0]
+			correctConfigPaths = filepath.Dir(matches[0])
+			break
+		} else {
+			log.Println("Config not found at path:", path)
+		}
+	}
+	config, err := env.LoadConfig(correctConfigPaths)
 	if err != nil {
 		panic("Failed to load environment variables: " + err.Error())
 	}

@@ -214,7 +214,6 @@ func (p *PageAnalyzer) analyzeForm(n *html.Node, result *models.AnalysisResult) 
 	// Check for input fields
 	p.checkFormInputs(n, &hasPassword, &hasUsername, &hasEmail, &inputCount)
 
-	// Determine if it's a login form based on input fields
 	if hasPassword && (hasUsername || hasEmail) {
 		formInfo.HasLogin = true
 	}
@@ -222,7 +221,6 @@ func (p *PageAnalyzer) analyzeForm(n *html.Node, result *models.AnalysisResult) 
 	formInfo.InputCount = inputCount
 	result.Forms = append(result.Forms, formInfo)
 
-	// Update the legacy field for backward compatibility
 	if formInfo.HasLogin {
 		result.HasLoginForm = true
 	}
@@ -248,7 +246,6 @@ func (p *PageAnalyzer) checkFormInputs(n *html.Node, hasPassword, hasUsername, h
 			*hasPassword = true
 		}
 
-		// Check for username/email fields
 		if inputType == "text" || inputType == "email" {
 			if strings.Contains(inputName, "user") || strings.Contains(inputName, "email") ||
 				strings.Contains(inputID, "user") || strings.Contains(inputID, "email") {

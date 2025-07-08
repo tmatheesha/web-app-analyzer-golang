@@ -43,10 +43,6 @@ WebLinkAnalyzer/
 
 ### DevOps & Tools
 - **Docker**: Containerization
-- **Docker Compose**: Multi-container orchestration
-- **Makefile**: Build automation
-- **golangci-lint**: Code quality
-- **gosec**: Security scanning
 
 ## 📊 Code Quality & Testing
 
@@ -56,21 +52,6 @@ WebLinkAnalyzer/
 
 ### Code Quality Tools
 - ✅ **go fmt**: Code formatting
-
-### Testing Strategy
-```bash
-# Run all tests
-make test
-
-# Run with coverage
-make test-coverage
-
-# Run benchmarks
-make bench
-
-# Run race detector
-make race
-```
 
 ## 🔒 Security Implementation
 
@@ -94,7 +75,6 @@ make race
 1. **Binary Deployment**: Direct Go binary execution
     - ✅ **Makefile**: Build and run commands
 2. **Docker Container**: Containerized deployment
-3. **Docker Compose**: Multi-service orchestration
 
 ### Production Features
 - ✅ **Graceful Shutdown**: Proper signal handling
