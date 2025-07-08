@@ -38,8 +38,7 @@ WebLinkAnalyzer/
 
 ### Frontend Technologies
 - **Go HTML Templates**: Server-side templating
-- **Pure CSS**: Responsive design without JavaScript
-- **Modern UI**: Clean, professional interface
+- **Pure CSS**: Used Inlined CSS without JavaScript
 
 ### DevOps & Tools
 - **Docker**: Containerization
@@ -60,8 +59,6 @@ WebLinkAnalyzer/
 - ✅ **Security Headers**: XSS protection, content type options
 - ✅ **CORS Configuration**: Proper cross-origin setup
 - ✅ **Error Sanitization**: Prevents information leakage
-- ✅ **Request Timeouts**: 30-second timeout protection
-- ✅ **User Agent**: Custom user agent to avoid blocking
 
 ## 📈 Monitoring & Observability
 
