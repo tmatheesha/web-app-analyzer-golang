@@ -21,6 +21,22 @@ WebLinkAnalyzer/
 └── configs/                  # Configuration files
 ```
 
+### Docker Deployment
+1. **Build Docker Image**:
+   ```bash
+   docker build -t web-analyzer .
+   ```
+
+2. **Run Container**:
+   ```bash
+   docker run -p 8080:8080 web-analyzer
+   ```
+
+3. **Access Application**:
+   - Web UI: `http://localhost:8080`
+   - API Endpoint: `http://localhost:8080/api/v1/analyze`
+
+
 ### Key Design Principles
 1. **Separation of Concerns**: Clear separation between layers
 2. **Dependency Injection**: Proper dependency management
