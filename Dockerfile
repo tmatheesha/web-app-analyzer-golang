@@ -31,8 +31,6 @@ COPY --from=builder /app/web-analyzer .
 COPY --from=builder /app/cmd/web-analyzer/app.env .
 # Copy templates into the image
 COPY --from=builder /app/web/templates ./web/templates
-# Copy statuc into the image
-COPY --from=builder /app/web/static ./web/static
 # Expose port
 EXPOSE 8080
 

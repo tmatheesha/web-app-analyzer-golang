@@ -13,7 +13,6 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"net/http"
-	"os"
 	"path/filepath"
 	"time"
 )
@@ -137,27 +136,6 @@ func (s Server) setupRoutes() {
 		panic("HTML templates not found")
 	}
 
-	staticPaths := []string{
-		"web/static",
-		"../web/static",
-		"../../web/static",
-	}
-
-	staticServed := false
-	for _, path := range staticPaths {
-		if _, err := os.Stat(path); err == nil {
-			s.engine.Static("/static", path)
-			s.logger.WithField("static_path", path).Info("Static files served successfully")
-			staticServed = true
-			break
-		}
-	}
-
-	if !staticServed {
-		s.logger.Error("Failed to serve static files from any path")
-	}
-
-	//s.engine.Static("../../static", "web/static")
 	s.engine.GET("/health", s.handler.HealthCheck)
 
 	api := s.engine.Group("/api/v1")
